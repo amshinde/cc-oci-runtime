@@ -421,14 +421,12 @@ main(int argc, char **argv)
 	/* Using self pipe trick to handle signals in the main loop, other strategy
 	 * would be to clock signals and use signalfd()/ to handle signals synchronously
 	 */
-	if (pipe(signal_pipe_fd) == -1) {
+	if (pipe2(signal_pipe_fd, O_NONBLOCK) == -1) {
 		err_exit("Error creating pipe\n");
 	}
 
-	// Add read end of pipe to pollfd list and make it non-bocking
+	// Add read end of pipe to pollfd list
 	add_pollfd(poll_fds, &nfds, signal_pipe_fd[0], POLLIN | POLLPRI);
-	set_fd_nonblocking(signal_pipe_fd[0]);
-	set_fd_nonblocking(signal_pipe_fd[1]);
 
 	sigemptyset(&sa.sa_mask);
 	sa.sa_flags = SA_RESTART;           /* Restart interrupted reads()s */
