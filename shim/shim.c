@@ -575,6 +575,12 @@ main(int argc, char **argv)
 		{ 0, 0, 0, 0},
 	};
 
+	/* Put the shim in stopped state, until is receives SIGCONT signal
+	 * from the runtime after the container has started running with the 
+	 * oci-start cmd.
+	 */
+	kill(getpid(), SIGSTOP);
+
 	while ((c = getopt_long(argc, argv, "c:p:o:s:e:dh", prog_opts, NULL))!= -1) {
 		switch (c) {
 			case 'c':
