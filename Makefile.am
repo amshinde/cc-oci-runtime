@@ -273,8 +273,22 @@ cc_proxy_extra_dist =			\
 
 CHECK_DEPS += check-proxy
 
+define CONTENT
+package main
+import "fmt"
+func main() {
+	fmt.Printf("Executing test program")
+}
+endef
+export CONTENT
+
 check-proxy:
-	go test -v -race -timeout 2s $(srcdir)/proxy
+	echo "$$CONTENT">race1-test.go
+	if ! go build -race race1-test.go; then \
+		go test -v -race -timeout 2s $(srcdir)/proxy; \
+	else \
+		go test -v -timeout 2s $(srcdir)/proxy; \
+	fi
 
 libexec_PROGRAMS = cc-shim
 
