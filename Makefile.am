@@ -250,7 +250,19 @@ endif
 
 proxy_ldflags = "-X main.DefaultSocketPath=$(localstatedir)/run/cc-oci-runtime/proxy.sock"
 cc-proxy: $(cc_proxy_sources)
-	$(AM_V_GO)go build -o $@ -ldflags=$(proxy_ldflags) $(srcdir)/proxy
+	[ -n "$$GOPATH" ] && \
+		( \
+			$(AM_V_GO)go build -o $@ -ldflags=$(proxy_ldflags) $(srcdir)/proxy ;\
+		) || \
+		( \
+			export GOPATH=$$(readlink -f $(srcdir))/.gopath ; \
+			rm -rf "$$GOPATH"; \
+			mkdir "$$GOPATH"; \
+			mkdir -p "$$GOPATH"/src/github.com/01org/ ; \
+			ln -sf $$(readlink -f $(srcdir)) "$$GOPATH"/src/github.com/01org/cc-oci-runtime ; \
+			cp -r $(srcdir)/vendor/* "$$GOPATH/src" ; \
+			go build -o $@ -ldflags=$(proxy_ldflags) $(srcdir)/proxy ;\
+		)
 
 cc_proxy_sources =			\
 	proxy/api/api.go		\
@@ -283,12 +295,22 @@ endef
 export CONTENT
 
 check-proxy:
-	echo "$$CONTENT">race1-test.go
+	echo "$$CONTENT">race1-test.go ;
+	if [ -z "$$GOPATH" ] ; then \
+		export GOPATH=$$(readlink -f $(srcdir))/.gopath ;\
+	fi ;\
+	if [ -z "$$GOPATH" ] ; then \
+		echo "GOPATH not set" ; \
+	else \
+		echo "GOPATH is set" ; \
+	fi ;
+
 	if ! go build -race race1-test.go; then \
 		go test -v -race -timeout 2s $(srcdir)/proxy; \
 	else \
 		go test -v -timeout 2s $(srcdir)/proxy; \
 	fi
+
 
 libexec_PROGRAMS = cc-shim
 
