@@ -666,6 +666,7 @@ cc_oci_network_discover(struct cc_oci_config *const config,
 				if ( cc_oci_get_interface_mtu(if_cfg->ifname, &mtu)) {
 					if_cfg->mtu = mtu;
 				} else {
+					freeifaddrs(ifaddrs);	
 					return false;
 				}
 			}
