@@ -287,6 +287,11 @@ cc_run_hook(struct oci_cfg_hook* hook, const gchar* state,
 		return false;
 	}
 
+	if (! hook->path) {
+		g_critical("hook path is empty");
+		return false;
+	}
+
 	if (hook->path[0] != '/') {
 		g_critical ("hook full path not specified");
 		return false;
