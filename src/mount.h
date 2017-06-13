@@ -55,4 +55,6 @@ void cc_oci_mount_free (struct cc_oci_mount *m);
 JsonArray *cc_oci_mounts_to_json (const struct cc_oci_config *config);
 JsonArray *cc_pod_mounts_to_json (const struct cc_oci_config *config);
 
+struct cc_oci_device cc_oci_device_for_path(char *path);
+
 #endif /* _CC_OCI_MOUNT_H */

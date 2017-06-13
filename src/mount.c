@@ -547,3 +547,22 @@ cc_pod_mounts_to_json (const struct cc_oci_config *config)
 
 	return cc_mounts_to_json(config->pod->rootfs_mounts);
 }
+
+int
+cc_device_for_path(gchar *path, uint *major, uint *minor)
+{
+	struct stat buf;
+
+	if (! (path && major && minor)) {
+		return -1;
+	}
+
+	if (stat(path, &buf) == -1) {
+		return -1;
+	}
+
+	*major = major(buf.st_dev);
+	*minor = minor(buf.st_dev);
+	
+	return 0;
+}
