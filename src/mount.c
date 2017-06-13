@@ -24,11 +24,14 @@
 #include <fcntl.h>
 
 #include <glib/gstdio.h>
+#include <gio/gunixmounts.h>
 
 #include "mount.h"
 #include "common.h"
 #include "namespace.h"
 #include "pod.h"
+
+gchar* proc_mounts_path = "/proc/mounts";
 
 /** Mounts that will be ignored.
  *
@@ -642,4 +645,32 @@ cc_mount_point_for_path(const gchar *path) {
 	}
 
 	return mount_point;
+}
+		
+int
+cc_get_device_and_fstype(gchar *mount_point, gchar **device_name, gchar **fstype) {
+	int ret = -1;
+	GList *mounts, *iter;
+	GUnixMountEntry *entry;
+
+	if (! (mount_point && device_name && fstype)) {
+		return ret;
+	}
+
+	mounts = g_unix_mounts_get(NULL);
+	for (iter = mounts; iter != NULL; iter = iter->next) {
+		entry = iter->data;
+
+		const char *mount_path = g_unix_mount_get_mount_path(entry);
+
+		if ((strcmp(mount_path, mount_point)) == 0) {
+			*device_name = strdup(g_unix_mount_get_device_path(entry));
+			*fstype = strdup(g_unix_mount_get_device_path(entry));
+			ret = 0;
+			break;
+		}
+	}
+
+	g_list_free_full(mounts, (GDestroyNotify)g_unix_mount_free);
+	return -1;
 }
