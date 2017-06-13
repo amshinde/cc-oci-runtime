@@ -566,3 +566,20 @@ cc_device_for_path(gchar *path, uint *major, uint *minor)
 	
 	return 0;
 }
+
+gboolean
+cc_is_devicemapper(uint major, uint minor)
+{
+	int ret;
+	gchar *sys_path = NULL;
+	struct stat buf;
+
+	sys_path = g_strdup_printf("/sys/dev/block/%d:%d/dm", major, minor);
+
+	ret = stat(sys_path, &buf);
+	if (ret == -1) {
+		return false;
+	}
+
+	return true;
+}
