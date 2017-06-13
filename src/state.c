@@ -66,6 +66,8 @@ static void handle_state_proxy_section(GNode*, struct handler_data*);
 static void handle_state_pod_section(GNode*, struct handler_data*);
 static void handle_state_annotations_section(GNode*, struct handler_data*);
 static void handle_state_process_section(GNode* node, struct handler_data* data);
+static void handle_state_fstype_section(GNode*, struct handler_data*);
+static void handle_state_blockIndex_section(GNode* node, struct handler_data* data);
 
 /*! Used to handle each section in \ref CC_OCI_STATE_FILE. */
 static struct state_handler {
@@ -98,6 +100,8 @@ static struct state_handler {
 	{ "pod"         , handle_state_pod_section         , 0 , 0 },
 	{ "annotations" , handle_state_annotations_section , 0 , 0 },
 	{ "namespaces"  , handle_state_namespaces_section  , 0 , 0 },
+	{ "fstype"      , handle_state_fstype_section      , 1 , 0 },
+	{ "blockIndex"  , handle_state_blockIndex_section  , 1 , 0 },
 
 	/* terminator */
 	{ NULL, NULL, 0, 0 }
@@ -561,6 +565,42 @@ handle_state_annotations_section(GNode* node, struct handler_data* data)
 
         data->state->annotations = g_slist_prepend(data->state->annotations,
                                                         ann);
+}
+
+/*!
+ *  handler for fstype section
+ *
+ * \param node \c GNode.
+ * \param data \ref handler_data.
+ */
+static void
+handle_state_fstype_section(GNode* node, struct handler_data* data) {
+	update_subelements_and_strdup(node, data, fstype);
+}
+
+/*!
+ *  handler for block index section
+ *
+ * \param node \c GNode.
+ * \param data \ref handler_data.
+ */
+static void
+handle_state_blockIndex_section(GNode* node, struct handler_data* data) {
+	gchar* endptr = NULL;
+
+	if (node) {
+		if (! node->data) {
+			return;
+		}
+		data->state->block_index =
+			(GPid)g_ascii_strtoll((char*)node->data, &endptr, 10);
+		if (endptr != node->data) {
+			(*(data->subelements_count))++;
+		} else {
+			g_critical("failed to convert '%s' to int",
+			    (char*)node->data);
+		}
+	}
 }
 
 /*!
