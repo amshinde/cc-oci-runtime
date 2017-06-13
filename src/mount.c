@@ -583,3 +583,63 @@ cc_is_devicemapper(uint major, uint minor)
 
 	return true;
 }
+
+gchar *
+cc_mount_point_for_path(const gchar *path) {
+	int ret = -1;
+	gchar *mount_point = NULL;
+	gchar *parent_dir = NULL;
+	struct stat parent_stat, cur_stat;
+
+	if (! path) {
+		return NULL;
+	}
+
+	if ( *path != '/') {
+		g_warning("No absolute path %s", path);
+		return NULL;
+	}
+
+	//ret = cc_device_for_path(path, major, minor);
+	//if (ret == -1) {
+	//	return NULL;
+	//}
+
+	if (g_strcmp0(path, "/") == 0 ) {
+		return g_strdup(path);
+	}
+
+	if (stat(path, &cur_stat) == -1) {
+		return NULL;
+	}
+
+	mount_point = strdup(path);
+
+	while (strcmp(mount_point,"/") == 0) {
+		parent_dir = g_path_get_dirname(mount_point);
+		
+		ret = lstat(parent_dir, &cur_stat);
+		if ( ret == -1) {
+			g_free(parent_dir);
+			g_free(mount_point);
+			return NULL;
+		}
+
+		if (cur_stat.st_dev != parent_stat.st_dev) {
+			break;
+		}
+
+		g_free(mount_point);
+		mount_point = parent_dir;
+		cur_stat = parent_stat;
+	}
+
+	g_free(parent_dir);
+	
+	if (strcmp(mount_point, "/") == 0) {
+		g_free(mount_point);
+		return NULL;
+	}
+
+	return mount_point;
+}

@@ -57,6 +57,6 @@ JsonArray *cc_pod_mounts_to_json (const struct cc_oci_config *config);
 
 struct cc_oci_device cc_oci_device_for_path(char *path);
 gboolean cc_is_devicemapper(uint major, uint minor);
-
+gchar *cc_mount_point_for_path(const gchar *path);
 
 #endif /* _CC_OCI_MOUNT_H */
