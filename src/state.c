@@ -93,6 +93,7 @@ static struct state_handler {
 	{ "bundlePath"  , handle_state_bundlePath_section  , 1 , 0 },
 	{ "commsPath"   , handle_state_commsPath_section   , 1 , 0 },
 	{ "processPath" , handle_state_processPath_section , 1 , 0 },
+	{ "workloadDir" , handle_state_workloadDir_section , 1 , 0 },
 	{ "status"      , handle_state_status_section      , 1 , 0 },
 	{ "created"     , handle_state_created_section     , 1 , 0 },
 	{ "mounts"      , handle_state_mounts_section      , 0 , 0 },

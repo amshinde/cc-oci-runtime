@@ -245,6 +245,11 @@ test_helper_create_state_file (const char *name,
 			"procsock-path",
 		  sizeof (config->state.procsock_path));
 
+	g_strlcpy (config->workload_dir,
+			"workload-dir",
+		  sizeof (config->workload_dir));
+
+
 	if (! cc_oci_runtime_dir_setup (config)) {
 		fprintf (stderr, "ERROR: failed to setup "
 				"runtime dir for vm %s\n", name);

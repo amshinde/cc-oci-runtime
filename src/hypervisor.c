@@ -153,13 +153,10 @@ cc_oci_check_for_devicemapper(struct cc_oci_config *config, char **device_name)
 	}
 
 	gchar *container_root = config->oci.root.path;
-
 	if (cc_device_for_path(container_root, &major, &minor) != 0) {
 		g_critical("Could not get the underlying device for rootfs");
 		return false;
 	}
-
-	g_debug("Path: %s, Major: %d, minor : %d", container_root, major, minor); 
 
 	if (! cc_is_devicemapper(major, minor)) {
 		return false;
@@ -175,11 +172,10 @@ cc_oci_check_for_devicemapper(struct cc_oci_config *config, char **device_name)
 		return false;
 	}
 
-	g_debug("Mount point for container rootfs %s is %s", container_root, mount_pnt);
-
 	if (cc_get_device_and_fstype(mount_pnt, device_name, &fstype) != 0) {
 		g_critical("Could not get device name for mountpoint %s", 
 				mount_pnt);
+		g_free(mount_pnt);
 		return false;
 	}
 
@@ -191,6 +187,7 @@ cc_oci_check_for_devicemapper(struct cc_oci_config *config, char **device_name)
 	config->state.block_index = block_index;
 	block_index++;
 
+	g_free(mount_pnt);
 	return true;
 }
 
@@ -206,20 +203,16 @@ cc_oci_append_storage_args(struct cc_oci_config *config,
 	}
 
 	if (cc_oci_check_for_devicemapper(config, &device_name)) {
-		g_debug("Devicemapper storage detected for container rootfs");
-		//gchar *drive_name = cc_get_virtio_drive_name(device_name);
-		//if (! drive_name) {
-		//	return false;
-		//}
-
 		g_ptr_array_add(additional_args, g_strdup("-device"));
 		g_ptr_array_add(additional_args, g_strdup_printf("virtio-blk,drive=drive-%d,scsi=off,config-wce=off",
 						config->state.block_index));
 		g_ptr_array_add(additional_args, g_strdup_printf("-drive\nid=drive-%d,file=%s,aio=threads,format=raw,if=none",
 						config->state.block_index, 
 						device_name));
-		//return true;
+		g_free(device_name);
+		return true;
 	}
+
 
 	// Append the overlay through 9pfs virtio
 	workload_dir = cc_oci_get_workload_dir(config);
@@ -296,7 +289,6 @@ cc_oci_expand_cmdline (struct cc_oci_config *config,
 	}
 
 	/* We're about to launch the hypervisor so validate paths.*/
-
 
 	if ((!config->vm->image_path[0])
 		|| stat (config->vm->image_path, &st) < 0) {

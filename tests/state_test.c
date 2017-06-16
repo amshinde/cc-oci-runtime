@@ -107,6 +107,9 @@ START_TEST(test_cc_oci_state_file_read) {
 	ck_assert(! cc_oci_state_file_read(TEST_DATA_DIR
 	                "/state-no-proxy-ioSocket.json"));
 
+	ck_assert(! cc_oci_state_file_read(TEST_DATA_DIR
+	                "/state-no-workloadDir.json"));
+
 	/* Annotations are optional*/
 	state = cc_oci_state_file_read(TEST_DATA_DIR
 	                "/state-no-annotations.json");
@@ -252,6 +255,11 @@ START_TEST(test_cc_oci_state_file_create) {
 	m->directory_created = g_strdup("/tmp/tmp/");
 	m->ignore_mount = true;
 	config->oci.mounts = g_slist_append(config->oci.mounts, m);
+
+	ck_assert (! cc_oci_state_file_create (config, timestamp));
+
+	g_strlcpy (config->workload_dir, "workload_dir",
+		sizeof (config->workload_dir));
 
 	/* All required elements now set */
 	ck_assert (cc_oci_state_file_create (config, timestamp));

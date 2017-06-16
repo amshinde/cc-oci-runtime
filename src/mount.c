@@ -32,8 +32,6 @@
 #include "namespace.h"
 #include "pod.h"
 
-gchar* proc_mounts_path = "/proc/mounts";
-
 /** Mounts that will be ignored.
  *
  * These are standard mounts that will be created within the VM
@@ -88,9 +86,9 @@ cc_oci_mount_ignore (struct cc_oci_mount *m)
 		/* Adding explicit check for bind-mounts here, we should be left with just
 		 * the bind-mounts after ignoring the system mounts.
 		 */
-		if ( !(m->flags & MS_BIND)) {
-			goto ignore;
-		}
+		//if ( !(m->flags & MS_BIND)) {
+		//	goto ignore;
+		//}
 	}
 
 	return false;
@@ -115,7 +113,8 @@ cc_oci_mount_free (struct cc_oci_mount *m)
 	g_free_if_set (m->mnt.mnt_type);
 	g_free_if_set (m->mnt.mnt_opts);
 	g_free_if_set (m->directory_created);
-
+	g_free_if_set (m->host_path);
+	
 	g_free (m);
 }
 
@@ -327,7 +326,6 @@ cc_handle_mounts(struct cc_oci_config *config, GSList *mounts, gboolean volume)
 			}
 		}
 
-		g_debug("########Directory created : %s\n", m->directory_created);
 		g_free_if_set(dirname_parent_dest);
 
 		ret = g_mkdir_with_parents (dirname_dest, CC_OCI_DIR_MODE);
@@ -497,12 +495,6 @@ cc_oci_handle_unmounts (const struct cc_oci_config *config)
 			mountns = cc_oci_ns_join (ns);
 			break;
 		}
-	}
-
-	if (mountns) {
-		g_debug("Mount namespace still present");
-	} else {
-		g_debug("Mount namespace not found");
 	}
 
 	/**
@@ -681,6 +673,8 @@ cc_is_devicemapper(uint major, uint minor)
 	sys_path = g_strdup_printf("/sys/dev/block/%d:%d/dm", major, minor);
 
 	ret = stat(sys_path, &buf);
+	g_free(sys_path);
+
 	if (ret == -1) {
 		return false;
 	}
@@ -700,14 +694,9 @@ cc_mount_point_for_path(const gchar *path) {
 	}
 
 	if ( *path != '/') {
-		g_warning("No absolute path %s", path);
+		g_warning("Absolute path not provided %s", path);
 		return NULL;
 	}
-
-	//ret = cc_device_for_path(path, major, minor);
-	//if (ret == -1) {
-	//	return NULL;
-	//}
 
 	if (g_strcmp0(path, "/") == 0 ) {
 		return g_strdup(path);
@@ -719,9 +708,8 @@ cc_mount_point_for_path(const gchar *path) {
 
 	mount_point = strdup(path);
 
-	while (strcmp(mount_point, "/") != 0) {
+	while (g_strcmp0(mount_point, "/") != 0) {
 		parent_dir = g_path_get_dirname(mount_point);
-		g_debug("Parent dir : %s", parent_dir);
 
 		ret = lstat(parent_dir, &parent_stat);
 		if ( ret == -1) {
@@ -741,7 +729,7 @@ cc_mount_point_for_path(const gchar *path) {
 
 	g_free(parent_dir);
 	
-	if (strcmp(mount_point, "/") == 0) {
+	if (g_strcmp0(mount_point, "/") == 0) {
 		g_free(mount_point);
 		return NULL;
 	}

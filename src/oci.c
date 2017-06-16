@@ -152,13 +152,7 @@ cc_oci_get_workload_dir (struct cc_oci_config *config)
 		return config->pod->sandbox_workloads;
 	}
 
-//	return config->oci.root.path;
-//	return config->workload_dir;
-	return g_strdup_printf("%s/%s/%s",
-			CC_OCI_RUNTIME_DIR_PREFIX,
-			config->optarg_container_id,
-			"workload");
-
+	return config->workload_dir;
 }
 
 /*!
@@ -1692,6 +1686,12 @@ cc_oci_config_update (struct cc_oci_config *config,
 		g_strlcpy (config->state.procsock_path,
 				state->procsock_path,
 				sizeof (config->state.procsock_path));
+	}
+
+	if (state->workload_dir) {
+		g_strlcpy (config->workload_dir,
+				state->workload_dir,
+				sizeof (config->workload_dir));
 	}
 
 	return true;
