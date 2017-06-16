@@ -30,6 +30,7 @@
 #include <uuid/uuid.h>
 
 #include "oci.h"
+#include "mount.h"
 #include "util.h"
 #include "hypervisor.h"
 #include "common.h"
@@ -44,6 +45,8 @@
  */
 private gchar *sysconfdir = SYSCONFDIR;
 private gchar *defaultsdir = DEFAULTSDIR;
+
+private int  block_index;
 
 static gchar *
 cc_oci_expand_net_cmdline(struct cc_oci_config *config) {
@@ -140,15 +143,85 @@ cc_oci_append_network_args(struct cc_oci_config *config,
 }
 
 static gboolean
+cc_oci_check_for_devicemapper(struct cc_oci_config *config, char **device_name)
+{
+	uint major, minor;
+	char *fstype = NULL;
+
+	if (! (config && device_name)) {
+		return false;
+	}
+
+	gchar *container_root = config->oci.root.path;
+
+	if (cc_device_for_path(container_root, &major, &minor) != 0) {
+		g_critical("Could not get the underlying device for rootfs");
+		return false;
+	}
+
+	g_debug("Path: %s, Major: %d, minor : %d", container_root, major, minor); 
+
+	if (! cc_is_devicemapper(major, minor)) {
+		return false;
+	}
+
+	g_debug("Devicemapper block device detected for container %s",
+			config->optarg_container_id);
+
+	gchar *mount_pnt =  cc_mount_point_for_path(container_root);
+	if ( ! mount_pnt) {
+		g_critical("Could not get mount point for %s\n", 
+				container_root);
+		return false;
+	}
+
+	g_debug("Mount point for container rootfs %s is %s", container_root, mount_pnt);
+
+	if (cc_get_device_and_fstype(mount_pnt, device_name, &fstype) != 0) {
+		g_critical("Could not get device name for mountpoint %s", 
+				mount_pnt);
+		return false;
+	}
+
+	g_debug("Device name, fstype fetched for container %s: %s, %s", 
+			config->optarg_container_id,
+			*device_name, fstype);
+
+	config->state.block_fstype = fstype;
+	config->state.block_index = block_index;
+	block_index++;
+
+	return true;
+}
+
+static gboolean
 cc_oci_append_storage_args(struct cc_oci_config *config,
 			GPtrArray *additional_args)
 {
 	gchar *workload_dir;
+	gchar *device_name;
 
 	if (! (config && additional_args)) {
 		return false;
 	}
 
+	if (cc_oci_check_for_devicemapper(config, &device_name)) {
+		g_debug("Devicemapper storage detected for container rootfs");
+		//gchar *drive_name = cc_get_virtio_drive_name(device_name);
+		//if (! drive_name) {
+		//	return false;
+		//}
+
+		g_ptr_array_add(additional_args, g_strdup("-device"));
+		g_ptr_array_add(additional_args, g_strdup_printf("virtio-blk,drive=drive-%d,scsi=off,config-wce=off",
+						config->state.block_index));
+		g_ptr_array_add(additional_args, g_strdup_printf("-drive\nid=drive-%d,file=%s,aio=threads,format=raw,if=none",
+						config->state.block_index, 
+						device_name));
+		//return true;
+	}
+
+	// Append the overlay through 9pfs virtio
 	workload_dir = cc_oci_get_workload_dir(config);
 	if (! workload_dir) {
 		g_critical ("No workload");

@@ -60,6 +60,84 @@ enum pod_namespace_id {
 static char *sandbox_name[] = {CC_POD_OCID_SANDBOX_NAME, CC_POD_CRIO_SANDBOX_NAME};
 static char *container_type[] = {CC_POD_OCID_CONTAINER_TYPE, CC_POD_CRIO_CONTAINER_TYPE};
 
+static struct cc_oci_mount*
+rootfs_bind_mount(struct cc_oci_config *config)
+{
+	struct cc_oci_mount *m;
+
+	if (! config ) {
+		return false;
+	}
+
+	m = g_malloc0 (sizeof (struct cc_oci_mount));
+	if (! m) {
+		goto error;
+	}
+
+	m->flags = MS_BIND;
+
+	/* Destination */
+	m->mnt.mnt_dir = g_malloc0(PATH_MAX);
+	if (! m->mnt.mnt_dir) {
+		goto error;
+	}
+
+	g_snprintf(m->mnt.mnt_dir, PATH_MAX, "/%s/rootfs",
+		   config->optarg_container_id);
+
+	/* Source */
+	m->mnt.mnt_fsname = g_strdup(config->oci.root.path);
+	if (! m->mnt.mnt_fsname) {
+		goto error;
+	}
+
+	/* Type */
+	m->mnt.mnt_type = g_strdup("bind");
+	if (! m->mnt.mnt_type) {
+		goto error;
+	}
+
+	g_warning("Rootfs bind mounting done");
+	return m;
+
+error:
+	if (m) {
+		g_free_if_set(m->mnt.mnt_dir);
+		g_free_if_set(m->mnt.mnt_fsname);
+		g_free_if_set(m->mnt.mnt_type);
+		g_free_if_set(m);
+	}
+
+	return NULL;
+}
+
+gboolean
+cc_add_rootfs_mount(struct cc_oci_config *config) {
+
+	struct cc_oci_mount *m;
+	
+	if ( !config || config->pod) {
+		return false;
+	}
+
+	m = rootfs_bind_mount(config);
+	if ( !m) {
+		return false;
+	}
+
+	config->rootfs_mount = g_slist_append(config->rootfs_mount, m);
+	
+	g_snprintf (config->workload_dir,
+			sizeof (config->workload_dir),
+			"%s/%s/%s",
+			CC_OCI_RUNTIME_DIR_PREFIX,
+			config->optarg_container_id,
+			"workload");
+
+	g_debug("Added rootfs bind mount for container");
+	return true;
+}
+
 /**
  * Creates a mount point structure for a
  * pod container rootfs.

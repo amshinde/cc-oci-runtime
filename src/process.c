@@ -1040,6 +1040,7 @@ child_failed:
 
 	cc_oci_populate_extra_args(config, additional_args);
 	ret = cc_oci_vm_args_get (config, &args, additional_args);
+	g_debug("@@@@@@@@@@@Fstype aftre append: %s\n", config->state.block_fstype);
 	if (! (ret && args)) {
 		goto out;
 	}
@@ -1171,6 +1172,7 @@ child_failed:
 	 */
 	g_debug ("recreating state file");
 
+	g_debug("22222222222222@@@@@@@@@@@Fstype aftre append: %s\n", config->state.block_fstype);
 	ret = cc_oci_state_file_create (config, timestamp);
 	if (! ret) {
 		g_critical ("failed to recreate state file");

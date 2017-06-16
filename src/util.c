@@ -254,6 +254,7 @@ cc_oci_rm_rf (const gchar *path)
 		return false;
 	}
 
+	g_debug("***************Deleting directory: %s",path);
 	cmd = g_strdup_printf ("%s -rf \"%s\" >/dev/null 2>&1",
 			CC_OCI_RM_CMD, path);
 	if (! cmd) {
@@ -261,8 +262,9 @@ cc_oci_rm_rf (const gchar *path)
 	}
 
 	if (system (cmd)) {
-		g_critical ("failed to remove directory %s", path);
+		g_critical ("*****failed to remove directory %s", path);
 	} else {
+		g_debug("***********Successfully deleted directory : %s\n", path);
 		ret = true;
 	}
 
@@ -709,6 +711,35 @@ dup_over_stdio(int *fdp){
 	return ret;
 }
 
+/**
+ * Generated random bytes.
+ *
+ * \param size Number of bytes to be genrated .
+ *
+ * \return \c Newly allocated buffer on success, NULL otherwise.
+ **/
+uint8_t *
+get_random_bytes(uint num) {
+	int fd;
+	char *file = "/dev/urandom"; 
+	uint8_t *buf;
+
+	buf = g_malloc0(num);
+
+	fd = open(file, O_RDONLY);
+	if (fd < 0) {
+		g_critical("Error opening %s: %s", file, strerror(errno));
+		return NULL;
+	}
+
+	if (read(fd, buf, num) == -1) {
+		g_critical("Error reading %s: %s", file, strerror(errno));
+		return NULL;
+	}
+
+	return buf;
+}
+
 #ifdef DEBUG
 static gboolean
 cc_oci_node_dump_aux(GNode* node, gpointer data) {
@@ -729,4 +760,5 @@ cc_oci_node_dump(GNode* node) {
 	g_message("debug: " "======== Dumping GNode: ========");
 	g_node_traverse(node, G_PRE_ORDER, G_TRAVERSE_ALL, -1, cc_oci_node_dump_aux, NULL);
 }
+
 #endif /*DEBUG*/

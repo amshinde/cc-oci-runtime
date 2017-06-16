@@ -31,6 +31,7 @@
 #include "util.h"
 #include "networking.h"
 #include "command.h"
+#include "mount.h"
 
 extern struct start_data start_data;
 
@@ -1273,6 +1274,27 @@ out:
 	return ret;
 }
 
+JsonArray *
+cc_get_hyper_fsmap(struct cc_oci_config *config)
+{
+	JsonArray  *fsmap_arr;
+	JsonObject *fsmap_desc;
+	GSList     *l;
+
+	fsmap_arr = json_array_new();
+	for (l = config->oci.mounts; l && l->data; l = g_slist_next (l)) {
+		fsmap_desc  = json_object_new ();
+		struct cc_oci_mount *m = (struct cc_oci_mount *)l->data;
+
+		json_object_set_string_member(fsmap_desc, "path", m->mnt.mnt_dir);
+		json_object_set_string_member(fsmap_desc, "source", m->host_path);
+		//json_object_set_string_member(fsmap_desc, "readonly", false);
+
+		json_array_add_object_element (fsmap_arr, fsmap_desc);
+	}
+
+	return fsmap_arr;
+}
 /**
  * Prepare an hyperstart newcontainer command using
  * the initial worload from \ref cc_oci_config and
@@ -1341,9 +1363,23 @@ cc_proxy_run_hyper_new_container (struct cc_oci_config *config,
 
 	json_object_set_string_member (newcontainer_payload, "id",
 				container_id);
-	json_object_set_string_member (newcontainer_payload, "rootfs", rootfs);
 
-	json_object_set_string_member (newcontainer_payload, "image", image);
+	if (config->state.block_fstype) {
+		gchar *drive_name = cc_get_virtio_drive_name(config->state.block_index);
+		if (! drive_name) {
+			return false;
+		}
+		json_object_set_string_member (newcontainer_payload, "image", drive_name);
+		json_object_set_string_member (newcontainer_payload, "fstype", config->state.block_fstype);
+		json_object_set_string_member (newcontainer_payload, "rootfs", "rootfs");
+		json_object_set_array_member (newcontainer_payload, "fsmap", cc_get_hyper_fsmap(config));
+	} else 
+	
+
+	{
+		json_object_set_string_member (newcontainer_payload, "rootfs", rootfs);
+		json_object_set_string_member (newcontainer_payload, "image", image);
+	}
 	/*json_object_set_string_member (newcontainer_payload, "image",
 	  config->optarg_container_id);
 	  */
@@ -1510,7 +1546,8 @@ cc_proxy_hyper_new_container (struct cc_oci_config *config)
 	return cc_proxy_hyper_new_pod_container(config,
 						config->optarg_container_id,
 						config->optarg_container_id,
-						"", "");
+						"rootfs", config->optarg_container_id);
+						//"", "");
 }
 
 /**

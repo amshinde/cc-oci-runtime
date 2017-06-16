@@ -38,4 +38,6 @@ gboolean cc_pod_is_pod_sandbox(const struct cc_oci_config *config);
 gboolean cc_pod_is_pod_container(const struct cc_oci_config *config);
 gboolean cc_pod_is_vm(const struct cc_oci_config *config);
 
+
+gboolean cc_add_rootfs_mount(struct cc_oci_config *config);
 #endif /* _CC_POD_H */

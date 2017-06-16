@@ -48,16 +48,21 @@ gboolean cc_oci_handle_mounts (struct cc_oci_config *config);
 gboolean cc_pod_handle_mounts (struct cc_oci_config *config);
 gboolean cc_oci_handle_unmounts (const struct cc_oci_config *config);
 gboolean cc_pod_handle_unmounts (const struct cc_oci_config *config);
+gboolean cc_oci_handle_rootfs_unmount (const struct cc_oci_config *config);
 
 void cc_oci_mounts_free_all (GSList *mounts);
 void cc_oci_mount_free (struct cc_oci_mount *m);
 
 JsonArray *cc_oci_mounts_to_json (const struct cc_oci_config *config);
 JsonArray *cc_pod_mounts_to_json (const struct cc_oci_config *config);
+JsonArray *cc_oci_rootfs_mount_to_json (const struct cc_oci_config *config);
 
-struct cc_oci_device cc_oci_device_for_path(char *path);
+int cc_device_for_path(gchar *path, uint *major, uint *minor);	
 gboolean cc_is_devicemapper(uint major, uint minor);
 gchar *cc_mount_point_for_path(const gchar *path);
 int cc_get_device_and_fstype(gchar *mount_point, gchar **device_name, gchar **fstype);
+gchar *cc_get_virtio_drive_name(int index);
 
+gboolean cc_handle_rootfs_mount (struct cc_oci_config *config);
+	
 #endif /* _CC_OCI_MOUNT_H */

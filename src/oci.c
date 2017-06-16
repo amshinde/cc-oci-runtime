@@ -152,7 +152,13 @@ cc_oci_get_workload_dir (struct cc_oci_config *config)
 		return config->pod->sandbox_workloads;
 	}
 
-	return config->oci.root.path;
+//	return config->oci.root.path;
+//	return config->workload_dir;
+	return g_strdup_printf("%s/%s/%s",
+			CC_OCI_RUNTIME_DIR_PREFIX,
+			config->optarg_container_id,
+			"workload");
+
 }
 
 /*!
@@ -228,6 +234,13 @@ cc_oci_get_config_and_state (gchar **config_file,
 	g_strlcpy (config->state.procsock_path,
 			(*state)->procsock_path,
 			sizeof (config->state.procsock_path));
+
+	g_strlcpy (config->workload_dir,
+			(*state)->workload_dir,
+			sizeof (config->workload_dir));
+
+	config->state.block_fstype = g_strdup((*state)->block_fstype);
+	config->state.block_index = (*state)->block_index;
 
 	*config_file = cc_oci_config_file_path ((*state)->bundle_path);
 	if (! (*config_file)) {
@@ -557,6 +570,11 @@ cc_oci_cleanup (struct cc_oci_config *config)
 		return false;
 	}
 
+	/* Container rootfs unmount should happen after volume unmounts */
+	if (! cc_oci_handle_rootfs_unmount(config)) {
+		return false;
+	}
+
 	/* Pod unmounts should happen after the volume unmounts */
 	if (! cc_pod_handle_unmounts(config)) {
 		return false;
@@ -687,6 +705,20 @@ cc_oci_create (struct cc_oci_config *config)
 		}
 
 		return false;
+	}
+
+	if (! config->pod) {
+		/* mount the container rootfs to {runtime_path}/{cid}/rootfs => /run/cc-oci-runtime/{cid}/{cid}/rootfs
+		 */
+		if (! cc_add_rootfs_mount(config)) {
+			g_critical("failed to add container rootfs bind mount");
+			return false;
+		}
+
+		if (! cc_handle_rootfs_mount(config)) {
+			g_critical("failed to mount container rootfs");
+			return false;
+		}
 	}
 
 	/**
@@ -1616,6 +1648,11 @@ cc_oci_config_update (struct cc_oci_config *config,
 	if (state->mounts) {
 		config->oci.mounts = state->mounts;
 		state->mounts = NULL;
+	}
+	
+	if (state->rootfs_mount) {
+		config->rootfs_mount = state->rootfs_mount;
+		state->rootfs_mount = NULL;
 	}
 
 	if (state->namespaces) {

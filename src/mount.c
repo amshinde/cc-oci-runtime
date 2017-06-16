@@ -22,6 +22,7 @@
 #include <errno.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <inttypes.h> 
 
 #include <glib/gstdio.h>
 #include <gio/gunixmounts.h>
@@ -81,6 +82,13 @@ cc_oci_mount_ignore (struct cc_oci_mount *m)
 		}
 
 		if (cc_oci_found_str_mntent_match (me, m, mnt_type)) {
+			goto ignore;
+		}
+
+		/* Adding explicit check for bind-mounts here, we should be left with just
+		 * the bind-mounts after ignoring the system mounts.
+		 */
+		if ( !(m->flags & MS_BIND)) {
 			goto ignore;
 		}
 	}
@@ -246,13 +254,42 @@ cc_handle_mounts(struct cc_oci_config *config, GSList *mounts, gboolean volume)
 			continue;
 		}
 
-		if ((! cc_pod_is_vm(config) || cc_pod_is_pod_sandbox(config)) && volume) {
-			g_snprintf (m->dest, sizeof (m->dest),
-				    "%s/%s/rootfs/%s", workload_dir, config->optarg_container_id, m->mnt.mnt_dir);
+		if ( !config->pod) {
+			if (! volume) {
+				// bind mount rootfs 
+				g_snprintf (m->dest, sizeof (m->dest),
+					"%s/%s",
+					workload_dir, m->mnt.mnt_dir);
+			} else {
+				// bind mount to workload_dir and create fsmap
+				uint64_t *bytes = (uint64_t*)get_random_bytes(8);
+				if ( !bytes) {
+					return false;
+				}
+
+				gchar *base_name = g_path_get_basename(m->mnt.mnt_dir);
+				m->host_path = g_strdup_printf("%"PRIx64"-%s",
+						*bytes,
+						base_name);
+				
+				g_snprintf (m->dest, sizeof (m->dest),
+					"%s/%s",
+					workload_dir, m->host_path);
+				
+				g_debug("Mounting bind mount %s for mnt_dir %s", m->dest, m->mnt.mnt_dir);
+				g_free(bytes);
+				g_free(base_name);
+			}
 		} else {
-			g_snprintf (m->dest, sizeof (m->dest),
-				    "%s/%s",
-				    workload_dir, m->mnt.mnt_dir);
+
+			if ((! cc_pod_is_vm(config) || cc_pod_is_pod_sandbox(config)) && volume) {
+				g_snprintf (m->dest, sizeof (m->dest),
+					    "%s/%s/rootfs/%s", workload_dir, config->optarg_container_id, m->mnt.mnt_dir);
+			} else {
+				g_snprintf (m->dest, sizeof (m->dest),
+					    "%s/%s",
+					    workload_dir, m->mnt.mnt_dir);
+			}
 		}
 
 		if (m->mnt.mnt_fsname[0] == '/') {
@@ -290,6 +327,7 @@ cc_handle_mounts(struct cc_oci_config *config, GSList *mounts, gboolean volume)
 			}
 		}
 
+		g_debug("########Directory created : %s\n", m->directory_created);
 		g_free_if_set(dirname_parent_dest);
 
 		ret = g_mkdir_with_parents (dirname_dest, CC_OCI_DIR_MODE);
@@ -345,6 +383,22 @@ cc_pod_handle_mounts (struct cc_oci_config *config)
 	return cc_handle_mounts(config, config->pod->rootfs_mounts, false);
 }
 
+/*!
+ * Setup container rootfs mount point.
+ *
+ * \param config \ref cc_oci_config.
+ *
+ * \return \c true on success, else \c false.
+ */
+gboolean
+cc_handle_rootfs_mount (struct cc_oci_config *config)
+{
+	if (!config || config->pod) {
+		return true;
+	}
+
+	return cc_handle_mounts(config, config->rootfs_mount, false);
+}
 /*!
  * Unmount the mount specified by \p m.
  *
@@ -445,13 +499,19 @@ cc_oci_handle_unmounts (const struct cc_oci_config *config)
 		}
 	}
 
+	if (mountns) {
+		g_debug("Mount namespace still present");
+	} else {
+		g_debug("Mount namespace not found");
+	}
+
 	/**
 	 * if there is NOT a specific mount namespace return true
 	 * since namespace created by unshare in \ref cc_oci_ns_setup
 	 * is destroyed when qemu ends
 	 */
 	if (! mountns && (cc_pod_is_vm(config) && !cc_pod_is_pod_sandbox(config))) {
-		return true;
+		//return true;
 	}
 
 	return cc_handle_unmounts(config->oci.mounts);
@@ -472,6 +532,23 @@ cc_pod_handle_unmounts (const struct cc_oci_config *config)
 	}
 
 	return cc_handle_unmounts(config->pod->rootfs_mounts);
+}
+
+/*!
+ * Unmount container rootfs mount point.
+ *
+ * \param config \ref cc_oci_config.
+ *
+ * \return \c true on success, else \c false.
+ */
+gboolean
+cc_oci_handle_rootfs_unmount (const struct cc_oci_config *config)
+{
+	if (!config || config->pod) {
+		return true;
+	}
+
+	return cc_handle_unmounts(config->rootfs_mount);
 }
 
 /*!
@@ -509,6 +586,14 @@ cc_mounts_to_json (GSList *mounts)
 		if (m->directory_created) {
 			json_object_set_string_member (mount, "directory_created",
 				m->directory_created);
+		}
+		
+		json_object_set_string_member (mount, "mnt_dir",
+			m->mnt.mnt_dir);
+
+		if (m->host_path) {
+			json_object_set_string_member (mount, "host_path",
+				m->host_path);
 		}
 
 		json_array_add_object_element (array, mount);
@@ -551,6 +636,22 @@ cc_pod_mounts_to_json (const struct cc_oci_config *config)
 	return cc_mounts_to_json(config->pod->rootfs_mounts);
 }
 
+/*!
+ * Convert container rootfs mount to a JSON array.
+ *
+ * \param config \ref cc_oci_config.
+ *
+ * \return \c JsonArray on success, else \c NULL.
+ */
+JsonArray *
+cc_oci_rootfs_mount_to_json (const struct cc_oci_config *config)
+{
+	if (!config || config->pod) {
+		return NULL;
+	}
+
+	return cc_mounts_to_json(config->rootfs_mount);
+}
 int
 cc_device_for_path(gchar *path, uint *major, uint *minor)
 {
@@ -618,10 +719,11 @@ cc_mount_point_for_path(const gchar *path) {
 
 	mount_point = strdup(path);
 
-	while (strcmp(mount_point,"/") == 0) {
+	while (strcmp(mount_point, "/") != 0) {
 		parent_dir = g_path_get_dirname(mount_point);
-		
-		ret = lstat(parent_dir, &cur_stat);
+		g_debug("Parent dir : %s", parent_dir);
+
+		ret = lstat(parent_dir, &parent_stat);
 		if ( ret == -1) {
 			g_free(parent_dir);
 			g_free(mount_point);
@@ -650,27 +752,85 @@ cc_mount_point_for_path(const gchar *path) {
 int
 cc_get_device_and_fstype(gchar *mount_point, gchar **device_name, gchar **fstype) {
 	int ret = -1;
-	GList *mounts, *iter;
-	GUnixMountEntry *entry;
+	struct mntent ent = { 0 };
+	struct mntent *mntent;
+	char buf[BUFSIZ];
+	FILE *file = NULL;
 
 	if (! (mount_point && device_name && fstype)) {
+		g_debug("Invalid input for proc_mounts_path");
 		return ret;
 	}
 
-	mounts = g_unix_mounts_get(NULL);
-	for (iter = mounts; iter != NULL; iter = iter->next) {
-		entry = iter->data;
+	/* note: glib api "g_unix_mounts_get" for fetching mount info, fails in case of
+	 * bind mounts. (https://bugzilla.gnome.org/show_bug.cgi?id=747540).
+	 * Use getmntent_r instead.
+	 */
 
-		const char *mount_path = g_unix_mount_get_mount_path(entry);
+	file = setmntent(PROC_MOUNTS_FILE, "r");
+	if ( !file) {
+		g_critical("Could not open file %s", PROC_MOUNTS_FILE);
+		return ret;
+	}
 
-		if ((strcmp(mount_path, mount_point)) == 0) {
-			*device_name = strdup(g_unix_mount_get_device_path(entry));
-			*fstype = strdup(g_unix_mount_get_device_path(entry));
-			ret = 0;
-			break;
+	while ((mntent = getmntent_r (file, &ent, buf, sizeof (buf))) != NULL) {
+		if (mntent->mnt_fsname) {
+			if (g_strcmp0(mntent->mnt_dir, mount_point) == 0) {
+				*device_name = g_strdup(mntent->mnt_fsname);
+				*fstype = g_strdup(mntent->mnt_type);
+				ret = 0;
+				break;
+			}
 		}
 	}
 
-	g_list_free_full(mounts, (GDestroyNotify)g_unix_mount_free);
-	return -1;
+	if ( !mntent) {
+		g_warning("Could not find device name for mount %s", mount_point);
+	}
+
+	endmntent(file);
+	return ret;
+}
+
+// Legacy naming scheme for virtio block devices
+// Reference : https://github.com/torvalds/linux/blob/master/drivers/block/virtio_blk.c#L478
+int
+virtblk_name_format(char *prefix, int index, char *buf, int buflen)
+{
+	const int base = 'z' - 'a' + 1;
+	char *begin = buf + strlen(prefix);
+	char *end = buf + buflen;
+	char *p;
+	int unit;
+
+	p = end - 1;
+	*p = '\0';
+	unit = base;
+	do {
+		if (p == begin) {
+			return -EINVAL;
+		}
+
+		*--p = (char)('a' + (index % unit));
+		index = (index / unit) - 1;
+	} while (index >= 0);
+
+	memmove(begin, p, (size_t)(end - p));
+	memcpy(buf, prefix, strlen(prefix));
+
+	return 0;
+}
+
+gchar *
+cc_get_virtio_drive_name(int index)
+{
+	int DISK_NAME_LEN = 32;
+
+	char disk_name[DISK_NAME_LEN];
+
+	if (virtblk_name_format("vd", index, disk_name, DISK_NAME_LEN) != 0) {
+		return NULL;
+	}
+
+	return strdup(disk_name);
 }
