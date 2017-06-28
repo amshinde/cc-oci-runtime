@@ -729,17 +729,17 @@ cc_oci_create (struct cc_oci_config *config)
 		return false;
 	}
 
+	if (! cc_oci_handle_mounts (config)) {
+		g_critical ("failed to handle mounts");
+		return false;
+	}
+
 	/* The namespace setup occurs in the parent to ensure
 	 * the hooks run successfully. The child will automatically
 	 * inherit the namespaces.
 	 */
 	if (! cc_oci_ns_setup (config)) {
 		g_critical ("failed to setup namespaces");
-		return false;
-	}
-
-	if (! cc_oci_handle_mounts (config)) {
-		g_critical ("failed to handle mounts");
 		return false;
 	}
 
