@@ -153,7 +153,8 @@ cc_oci_append_storage_args(struct cc_oci_config *config,
 		g_ptr_array_add(additional_args, g_strdup("-device"));
 		g_ptr_array_add(additional_args, g_strdup_printf("virtio-blk,drive=drive-%d,scsi=off,config-wce=off",
 			       config->state.block_index));
-		g_ptr_array_add(additional_args, g_strdup_printf("-drive\nid=drive-%d,file=%s,aio=threads,format=raw,if=none",
+		//g_ptr_array_add(additional_args, g_strdup_printf("-drive\nid=drive-%d,file=%s,aio=threads,format=raw,if=none",
+		g_ptr_array_add(additional_args, g_strdup_printf("-drive\nid=drive-%d,file=%s,aio=native,format=raw,if=none,cache=writethrough",
 			       config->state.block_index, 
 			       config->device_name));
 	}
