@@ -798,7 +798,7 @@ cc_get_virtio_drive_name(int index)
 		return NULL;
 	}
 
-	if (virtblk_name_format("vd", index, disk_name, DISK_NAME_LEN) != 0) {
+	if (virtblk_name_format("sd", index, disk_name, DISK_NAME_LEN) != 0) {
 		return NULL;
 	}
 

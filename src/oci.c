@@ -718,7 +718,7 @@ cc_oci_create (struct cc_oci_config *config)
 				g_critical("failed to mount container rootfs");
 				return false;
 			}
-		}
+		}	
 	}
 
 	/**

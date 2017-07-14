@@ -1388,7 +1388,9 @@ cc_proxy_run_hyper_new_container (struct cc_oci_config *config,
 		json_object_set_string_member (newcontainer_payload, "image", drive_name);
 		json_object_set_string_member (newcontainer_payload, "fstype", config->state.block_fstype);
 		json_object_set_string_member (newcontainer_payload, "rootfs", "rootfs");
-	} else {
+	} 
+	else
+	{
 		json_object_set_string_member (newcontainer_payload, "rootfs", rootfs);
 		json_object_set_string_member (newcontainer_payload, "image", image);
 	}

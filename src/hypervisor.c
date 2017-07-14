@@ -151,9 +151,15 @@ cc_oci_append_storage_args(struct cc_oci_config *config,
 
 	if (config->device_name) {
 		g_ptr_array_add(additional_args, g_strdup("-device"));
-		g_ptr_array_add(additional_args, g_strdup_printf("virtio-blk,drive=drive-%d,scsi=off,config-wce=off",
+		//g_ptr_array_add(additional_args, g_strdup_printf("virtio-blk,drive=drive-%d,scsi=off,config-wce=off",
+		//	       config->state.block_index));
+		//g_ptr_array_add(additional_args, g_strdup_printf("scsi-disk,drive=drive-%d,bus=/pci-lite-host/scsi.0",
+		//g_ptr_array_add(additional_args, g_strdup_printf("scsi-disk,drive=drive-%d",
+		g_ptr_array_add(additional_args, g_strdup_printf("virtio-scsi-pci,id=scsi0,bus=/pci-lite-host/pcie.0"));
+			       //config->state.block_index));
+		g_ptr_array_add(additional_args, g_strdup_printf("-device\nscsi-hd,bus=scsi0.0,drive=drive-%d",
 			       config->state.block_index));
-		g_ptr_array_add(additional_args, g_strdup_printf("-drive\nid=drive-%d,file=%s,aio=threads,format=raw,if=none",
+		g_ptr_array_add(additional_args, g_strdup_printf("-drive\nid=drive-%d,file=%s,cache=writethrough,aio=threads,format=raw,if=none",
 			       config->state.block_index, 
 			       config->device_name));
 	}
